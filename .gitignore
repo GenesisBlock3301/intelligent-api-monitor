@@ -1,0 +1,10 @@
+# Local environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# IDE settings
+.idea/
+
+# Operating-system files
+.DS_Store
