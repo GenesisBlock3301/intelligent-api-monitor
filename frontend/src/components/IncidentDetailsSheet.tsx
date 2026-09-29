@@ -7,13 +7,14 @@ import { SeverityBadge } from "./SeverityBadge";
 interface IncidentDetailsSheetProps {
   incident: Incident | null;
   onClose: () => void;
+  onResolve: (id: string) => void;
 }
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-export function IncidentDetailsSheet({ incident, onClose }: IncidentDetailsSheetProps) {
+export function IncidentDetailsSheet({ incident, onClose, onResolve }: IncidentDetailsSheetProps) {
   return (
     <Dialog.Root open={incident !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
@@ -30,7 +31,12 @@ export function IncidentDetailsSheet({ incident, onClose }: IncidentDetailsSheet
                 <Dialog.Close className="sheet-close" aria-label="Close incident details"><X size={20} /></Dialog.Close>
               </div>
 
-              <div className="sheet-badges"><SeverityBadge severity={incident.severity} /><span className="status-badge">{incident.status}</span></div>
+              <div className="sheet-badges">
+                <SeverityBadge severity={incident.severity} />
+                <span className={`status-badge ${incident.status === "RESOLVED" ? "status-resolved" : "status-active"}`}>
+                  {incident.status}
+                </span>
+              </div>
 
               <section className="sheet-section">
                 <h3><ShieldAlert size={17} aria-hidden="true" /> Triggered rules</h3>
@@ -57,9 +63,20 @@ export function IncidentDetailsSheet({ incident, onClose }: IncidentDetailsSheet
                 <dl className="metrics-list">
                   <div><dt>First seen</dt><dd>{formatDate(incident.first_seen_at)}</dd></div>
                   <div><dt>Last seen</dt><dd>{formatDate(incident.last_seen_at)}</dd></div>
+                  {incident.resolved_at && <div><dt>Resolved at</dt><dd>{formatDate(incident.resolved_at)}</dd></div>}
                   <div><dt>Occurrences</dt><dd><CheckCircle2 size={15} aria-hidden="true" /> {incident.occurrence_count}</dd></div>
                 </dl>
               </section>
+
+              {incident.status === "ACTIVE" && (
+                <button
+                  className="resolve-button"
+                  type="button"
+                  onClick={() => onResolve(incident.id)}
+                >
+                  <CheckCircle2 size={16} aria-hidden="true" /> Resolve incident
+                </button>
+              )}
             </>
           )}
         </Dialog.Content>

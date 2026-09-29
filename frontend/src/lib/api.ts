@@ -1,4 +1,6 @@
 export type Severity = "MEDIUM" | "HIGH" | "CRITICAL";
+export type IncidentStatus = "ACTIVE" | "RESOLVED";
+export type StatusFilter = "ACTIVE" | "RESOLVED" | "ALL";
 
 export interface Incident {
   id: string;
@@ -9,26 +11,121 @@ export interface Incident {
   response_time_ms: number;
   records_returned: number;
   alert_source: "LLM" | "FALLBACK";
-  status: "ACTIVE" | "RESOLVED";
+  status: IncidentStatus;
   occurrence_count: number;
   first_seen_at: string;
   last_seen_at: string;
+  resolved_at: string | null;
   alert_message: string;
 }
 
-interface AlertsResponse {
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface AlertsSummary {
+  active: number;
+  resolved: number;
+  critical: number;
+  high: number;
+  medium: number;
+  affectedApis: number;
+}
+
+export interface AlertsResponse {
   data: Incident[];
+  pagination: Pagination;
+  summary: AlertsSummary;
+}
+
+export interface AppSettings {
+  llm_provider: string;
+  llm_api_key: string;
+  llm_model: string;
+  email_enabled: string;
+  email_to: string;
+  email_from: string;
+  email_password: string;
 }
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 
-export async function fetchAlerts(signal?: AbortSignal): Promise<Incident[]> {
-  const response = await fetch(`${apiBaseUrl}/alerts`, { signal });
+export async function fetchAlerts(page = 1, limit = 20, status: StatusFilter = "ACTIVE", signal?: AbortSignal): Promise<AlertsResponse> {
+  const url = `${apiBaseUrl}/alerts?page=${page}&limit=${limit}&status=${status}`;
+  const response = await fetch(url, { signal });
 
   if (!response.ok) {
     throw new Error(`Alerts request failed with status ${response.status}`);
   }
 
-  const payload = await response.json() as AlertsResponse;
+  return await response.json() as AlertsResponse;
+}
+
+export async function fetchSettings(): Promise<AppSettings> {
+  const response = await fetch(`${apiBaseUrl}/settings`);
+  if (!response.ok) throw new Error(`Settings request failed with status ${response.status}`);
+  const payload = await response.json() as { data: AppSettings };
+  return payload.data;
+}
+
+export async function updateSettings(settings: Partial<AppSettings>): Promise<AppSettings> {
+  const response = await fetch(`${apiBaseUrl}/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!response.ok) throw new Error(`Settings update failed with status ${response.status}`);
+  const payload = await response.json() as { data: AppSettings };
+  return payload.data;
+}
+
+export interface TestEventInput {
+  api_name: string;
+  status_code: number;
+  response_time_ms: number;
+  records_returned: number;
+}
+
+export interface MonitorResultDetail {
+  kind: "HEALTHY" | "ANOMALY" | "ERROR";
+  api_name?: string;
+  action?: "CREATED" | "UPDATED";
+  severity?: Severity;
+  anomaly_types?: string[];
+  incident_id?: string;
+  alert_message?: string;
+  message?: string;
+}
+
+export interface MonitorResponse {
+  received: number;
+  processed: number;
+  healthy: number;
+  anomalies: number;
+  failed: number;
+  results: MonitorResultDetail[];
+}
+
+export async function submitTestEvent(event: TestEventInput): Promise<MonitorResponse> {
+  const response = await fetch(`${apiBaseUrl}/monitor`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify([event]),
+  });
+  if (!response.ok) throw new Error(`Monitor request failed with status ${response.status}`);
+  return await response.json() as MonitorResponse;
+}
+
+export async function resolveIncident(id: string): Promise<Incident> {
+  const response = await fetch(`${apiBaseUrl}/alerts/${id}/resolve`, { method: "PATCH" });
+
+  if (!response.ok) {
+    throw new Error(`Resolve request failed with status ${response.status}`);
+  }
+
+  const payload = await response.json() as { data: Incident };
   return payload.data;
 }

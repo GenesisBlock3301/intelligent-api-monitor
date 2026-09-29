@@ -1,13 +1,30 @@
-import { Activity, AlertTriangle, Boxes, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Activity, AlertTriangle, Boxes, FlaskConical, RefreshCw, Settings } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { IncidentTable } from "./components/IncidentTable";
 import { IncidentDetailsSheet } from "./components/IncidentDetailsSheet";
+import { SettingsPanel } from "./components/SettingsPanel";
+import { TestEventForm } from "./components/TestEventForm";
 import { SummaryCard } from "./components/SummaryCard";
-import { fetchAlerts, type Incident } from "./lib/api";
+import { fetchAlerts, resolveIncident, type AlertsResponse, type AlertsSummary, type Incident, type Pagination, type StatusFilter } from "./lib/api";
 import "./App.css";
 
-const pollIntervalMs = 8_000;
+function BrandMark() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path d="M16 2.5L4.5 7.5v7c0 7.46 4.93 14.45 11.5 16 6.57-1.55 11.5-8.54 11.5-16v-7L16 2.5z" fill="#1e293b" stroke="#475569" strokeWidth="0.75" />
+      <path d="M9.5 16.5h3l1.5-3.5 2.5 7 2-5 2 2.5h3" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+const POLL_INTERVAL_MS = 8_000;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+const STATUS_TABS: { label: string; value: StatusFilter }[] = [
+  { label: "Active", value: "ACTIVE" },
+  { label: "Resolved", value: "RESOLVED" },
+  { label: "All", value: "ALL" },
+];
 
 function LoadingTable() {
   return (
@@ -20,90 +37,168 @@ function LoadingTable() {
 
 function App() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [pageSize, setPageSize] = useState<number>(20);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ACTIVE");
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: pageSize, total: 0, totalPages: 1 });
+  const [summary, setSummary] = useState<AlertsSummary>({ active: 0, resolved: 0, critical: 0, high: 0, medium: 0, affectedApis: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [testFormOpen, setTestFormOpen] = useState(false);
+  const pageRef = useRef(1);
+  const pageSizeRef = useRef(pageSize);
+  const statusRef = useRef(statusFilter);
 
-  const loadAlerts = async () => {
+  const loadAlerts = useCallback(async (page?: number, limit?: number, status?: StatusFilter) => {
+    const targetPage = page ?? pageRef.current;
+    const targetLimit = limit ?? pageSizeRef.current;
+    const targetStatus = status ?? statusRef.current;
     try {
       setError(null);
-      const alerts = await fetchAlerts();
-      setIncidents(alerts);
-      setSelectedIncidentId((selected) => alerts.some((incident) => incident.id === selected) ? selected : null);
+      const result: AlertsResponse = await fetchAlerts(targetPage, targetLimit, targetStatus);
+      setIncidents(result.data);
+      setPagination(result.pagination);
+      setSummary(result.summary);
+      pageRef.current = result.pagination.page;
+      setSelectedIncidentId((selected) => result.data.some((i) => i.id === selected) ? selected : null);
     } catch {
       setError("Unable to load active incidents.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    const initialLoad = window.setTimeout(() => void loadAlerts(), 0);
-    const poller = window.setInterval(() => void loadAlerts(), pollIntervalMs);
+    const initialLoad = window.setTimeout(() => void loadAlerts(1), 0);
+    const poller = window.setInterval(() => void loadAlerts(), POLL_INTERVAL_MS);
     return () => {
       window.clearTimeout(initialLoad);
       window.clearInterval(poller);
     };
-  }, []);
+  }, [loadAlerts]);
 
-  const summary = useMemo(() => ({
-    active: incidents.length,
-    critical: incidents.filter((incident) => incident.severity === "CRITICAL").length,
-    affectedApis: new Set(incidents.map((incident) => incident.api_name)).size,
-  }), [incidents]);
-  const selectedIncident = incidents.find((incident) => incident.id === selectedIncidentId) ?? null;
+  const goToPage = (page: number) => {
+    setIsLoading(true);
+    void loadAlerts(page);
+  };
+
+  const changePageSize = (newSize: number) => {
+    setPageSize(newSize);
+    pageSizeRef.current = newSize;
+    setIsLoading(true);
+    void loadAlerts(1, newSize);
+  };
+
+  const changeStatus = (status: StatusFilter) => {
+    setStatusFilter(status);
+    statusRef.current = status;
+    setIsLoading(true);
+    void loadAlerts(1, undefined, status);
+  };
+
+  const handleResolve = async (id: string) => {
+    try {
+      await resolveIncident(id);
+      setSelectedIncidentId(null);
+      void loadAlerts();
+    } catch {
+      setError("Failed to resolve incident.");
+    }
+  };
+
+  const selectedIncident = incidents.find((i) => i.id === selectedIncidentId) ?? null;
 
   return (
-    <main className="dashboard-shell">
-      <header className="dashboard-header">
-        <div>
-          <p className="eyebrow">OPERATIONS CONSOLE</p>
-          <h1>API Sentinel</h1>
-          <p className="subtitle">Intelligent API monitoring and incident response</p>
+    <>
+      <nav className="navbar">
+        <div className="navbar-inner">
+          <div className="navbar-brand">
+            <BrandMark />
+            <span className="navbar-title">API Sentinel</span>
+          </div>
+          <div className="navbar-actions">
+            <div className="navbar-status"><span aria-hidden="true" /> Monitoring</div>
+            <div className="navbar-divider" aria-hidden="true" />
+            <button className="navbar-test-btn" type="button" onClick={() => setTestFormOpen(true)}>
+              <FlaskConical size={15} aria-hidden="true" /> Test Event
+            </button>
+            <button className="navbar-icon-btn" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings">
+              <Settings size={18} aria-hidden="true" />
+            </button>
+          </div>
         </div>
-        <div className="monitoring-status"><span aria-hidden="true" /> Monitoring active</div>
-      </header>
+      </nav>
+      <main className="dashboard-content">
+        <section className="summary-grid" aria-label="Incident summary">
+          <SummaryCard label="Active alerts" value={summary.active} icon={<Activity size={20} />} />
+          <SummaryCard label="Critical alerts" value={summary.critical} icon={<AlertTriangle size={20} />} />
+          <SummaryCard label="Affected APIs" value={summary.affectedApis} icon={<Boxes size={20} />} />
+        </section>
 
-      <section className="summary-grid" aria-label="Incident summary">
-        <SummaryCard label="Active alerts" value={summary.active} icon={<Activity size={20} />} />
-        <SummaryCard label="Critical alerts" value={summary.critical} icon={<AlertTriangle size={20} />} />
-        <SummaryCard label="Affected APIs" value={summary.affectedApis} icon={<Boxes size={20} />} />
-      </section>
+        <section className="incidents-panel" aria-labelledby="incidents-title">
+          <div className="panel-heading">
+            <div>
+              <h2 id="incidents-title">Incidents</h2>
+              <p>Page {pagination.page} of {pagination.totalPages} &middot; {pagination.total} total &middot; Updates every 8s</p>
+            </div>
+            <div className="panel-actions">
+              <div className="status-tabs" role="tablist">
+                {STATUS_TABS.map((tab) => (
+                  <button
+                    key={tab.value}
+                    role="tab"
+                    className={`status-tab ${statusFilter === tab.value ? "status-tab-active" : ""}`}
+                    aria-selected={statusFilter === tab.value}
+                    onClick={() => changeStatus(tab.value)}
+                  >
+                    {tab.label}
+                    {tab.value === "ACTIVE" && summary.active > 0 && <span className="tab-count">{summary.active}</span>}
+                    {tab.value === "RESOLVED" && summary.resolved > 0 && <span className="tab-count tab-count-resolved">{summary.resolved}</span>}
+                  </button>
+                ))}
+              </div>
+              <button className="refresh-button" type="button" onClick={() => { setIsLoading(true); void loadAlerts(); }}>
+                <RefreshCw size={16} aria-hidden="true" /> Refresh
+              </button>
+            </div>
+          </div>
 
-      <section className="incidents-panel" aria-labelledby="incidents-title">
-        <div className="panel-heading">
-          <div>
-            <h2 id="incidents-title">Active incidents</h2>
-            <p>Updates automatically every 8 seconds.</p>
-          </div>
-          <button className="refresh-button" type="button" onClick={() => { setIsLoading(true); void loadAlerts(); }}>
-            <RefreshCw size={16} aria-hidden="true" /> Refresh
-          </button>
-        </div>
-
-        {isLoading && <LoadingTable />}
-        {!isLoading && error && (
-          <div className="state-message error-state" role="alert">
-            <AlertTriangle size={22} aria-hidden="true" />
-            <div><strong>{error}</strong><button type="button" onClick={() => { setIsLoading(true); void loadAlerts(); }}>Retry</button></div>
-          </div>
-        )}
-        {!isLoading && !error && incidents.length === 0 && (
-          <div className="state-message empty-state">
-            <Activity size={24} aria-hidden="true" />
-            <div><strong>No active incidents</strong><p>All monitored API events currently pass the configured health rules.</p></div>
-          </div>
-        )}
-        {!isLoading && !error && incidents.length > 0 && (
-          <IncidentTable
-            incidents={incidents}
-            selectedIncidentId={selectedIncidentId}
-            onSelect={(incident) => setSelectedIncidentId(incident.id)}
-          />
-        )}
-      </section>
-      <IncidentDetailsSheet incident={selectedIncident} onClose={() => setSelectedIncidentId(null)} />
-    </main>
+          {isLoading && <LoadingTable />}
+          {!isLoading && error && (
+            <div className="state-message error-state" role="alert">
+              <AlertTriangle size={22} aria-hidden="true" />
+              <div><strong>{error}</strong><button type="button" onClick={() => { setIsLoading(true); void loadAlerts(); }}>Retry</button></div>
+            </div>
+          )}
+          {!isLoading && !error && incidents.length === 0 && (
+            <div className="state-message empty-state">
+              <Activity size={24} aria-hidden="true" />
+              <div>
+                <strong>{statusFilter === "RESOLVED" ? "No resolved incidents" : "No active incidents"}</strong>
+                <p>{statusFilter === "RESOLVED" ? "No incidents have been resolved yet." : "All monitored API events currently pass the configured health rules."}</p>
+              </div>
+            </div>
+          )}
+          {!isLoading && !error && incidents.length > 0 && (
+            <IncidentTable
+              incidents={incidents}
+              selectedIncidentId={selectedIncidentId}
+              onSelect={(incident) => setSelectedIncidentId(incident.id)}
+              pagination={pagination}
+              onPageChange={goToPage}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              onPageSizeChange={changePageSize}
+              showStatus={statusFilter === "ALL"}
+            />
+          )}
+        </section>
+      </main>
+      <IncidentDetailsSheet incident={selectedIncident} onClose={() => setSelectedIncidentId(null)} onResolve={handleResolve} />
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <TestEventForm open={testFormOpen} onClose={() => setTestFormOpen(false)} onSubmitted={() => void loadAlerts()} />
+    </>
   );
 }
 

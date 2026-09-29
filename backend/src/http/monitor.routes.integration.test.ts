@@ -1,17 +1,28 @@
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import request from "supertest";
+import { Redis } from "ioredis";
 
+import { env } from "../config/env.js";
 import { monitoringConfig } from "../config/monitoring.js";
 import { buildIncidentFingerprint } from "../domain/incident-fingerprint.js";
 import { createApp } from "./app.js";
 import { databasePool } from "../infrastructure/database/pool.js";
 import { IncidentRepository } from "../repositories/incident.repository.js";
+import { SettingsRepository } from "../repositories/settings.repository.js";
 import { MonitoringService } from "../services/monitoring.service.js";
 
 const runDatabaseTests = process.env.RUN_DATABASE_TESTS === "true";
 const describeDatabase = runDatabaseTests ? describe : describe.skip;
 const repository = new IncidentRepository(databasePool);
-const app = createApp(new MonitoringService(repository, monitoringConfig), repository);
+const settingsRepository = new SettingsRepository(databasePool);
+const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: 3, lazyConnect: true });
+const app = createApp({
+  monitoringService: new MonitoringService(repository, monitoringConfig),
+  incidentRepository: repository,
+  settingsRepository,
+  redis,
+  rateLimitConfig: { windowSeconds: 60, maxRequests: 10000 },
+});
 const apiName = `MonitorIntegrationAPI-${crypto.randomUUID()}`;
 
 describeDatabase("POST /monitor", () => {
@@ -20,6 +31,7 @@ describeDatabase("POST /monitor", () => {
   });
 
   afterAll(async () => {
+    redis.disconnect();
     await databasePool.end();
   });
 
@@ -90,6 +102,8 @@ describeDatabase("POST /monitor", () => {
     expect(response.body.data).toEqual(expect.arrayContaining([
       expect.objectContaining({ api_name: apiName, status: "ACTIVE", severity: "MEDIUM" }),
     ]));
+    expect(response.body.pagination).toMatchObject({ page: 1, limit: 20 });
+    expect(response.body.summary).toMatchObject({ affectedApis: expect.any(Number) });
   });
 
   it("rejects invalid telemetry before processing", async () => {

@@ -1,6 +1,13 @@
 import OpenAI from "openai";
+import type { Logger } from "pino";
 
 import type { AlertGenerationContext, AlertGenerator } from "./alert-generator.js";
+import type { SettingsRepository } from "../repositories/settings.repository.js";
+
+const BASE_URLS: Record<string, string | undefined> = {
+  openai: undefined,
+  deepseek: "https://api.deepseek.com",
+};
 
 const systemPrompt = `You are an incident communication assistant for an API monitoring platform.
 
@@ -20,16 +27,53 @@ Rules:
 Good: "The CertRotator service is currently down and not returning any data. Requests are also taking significantly longer than normal."
 Bad: "CertRotatorAPI returned HTTP 500 in 6223 ms with 0 records. Anomalies: HTTP_FAILURE, HIGH_LATENCY, ZERO_RECORDS."`;
 
+interface EnvFallback {
+  provider: string;
+  apiKey?: string;
+  model: string;
+  baseURL?: string;
+  timeoutMs: number;
+}
 
-export class OpenAIAlertGenerator implements AlertGenerator {
+export class DynamicAlertGenerator implements AlertGenerator {
+  private cachedClient: OpenAI | null = null;
+  private cachedClientKey = "";
+
   constructor(
-    private readonly client: OpenAI,
-    private readonly model: string,
+    private readonly settingsRepository: SettingsRepository,
+    private readonly envFallback: EnvFallback,
+    private readonly logger?: Logger,
   ) {}
 
+  private getOrCreateClient(apiKey: string, baseURL: string | undefined, timeoutMs: number): OpenAI {
+    const clientKey = `${apiKey}:${baseURL ?? ""}`;
+    if (this.cachedClient && this.cachedClientKey === clientKey) {
+      return this.cachedClient;
+    }
+    this.cachedClient = new OpenAI({ apiKey, baseURL, timeout: timeoutMs });
+    this.cachedClientKey = clientKey;
+    return this.cachedClient;
+  }
+
   async generate(context: AlertGenerationContext): Promise<string> {
-    const response = await this.client.chat.completions.create({
-      model: this.model,
+    const settings = await this.settingsRepository.getAll();
+
+    const provider = settings.llm_provider || this.envFallback.provider;
+    const apiKey = settings.llm_api_key || this.envFallback.apiKey;
+    const model = settings.llm_model || this.envFallback.model;
+
+    if (provider === "disabled" || !apiKey) {
+      throw new Error("LLM not configured");
+    }
+
+    const baseURL = BASE_URLS[provider] ?? this.envFallback.baseURL;
+
+    this.logger?.info({ event: "llm_dynamic_call", provider, model });
+
+    const client = this.getOrCreateClient(apiKey, baseURL, this.envFallback.timeoutMs);
+
+    const response = await client.chat.completions.create({
+      model,
       max_tokens: 150,
       temperature: 0.3,
       messages: [
@@ -47,12 +91,9 @@ export class OpenAIAlertGenerator implements AlertGenerator {
         },
       ],
     });
+
     const message = response.choices[0]?.message?.content?.trim() ?? "";
-
-    if (!message) {
-      throw new Error("LLM returned an empty alert message");
-    }
-
+    if (!message) throw new Error("LLM returned an empty alert message");
     return message;
   }
 }

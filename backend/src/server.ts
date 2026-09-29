@@ -4,31 +4,61 @@ import { monitoringConfig } from "./config/monitoring.js";
 import { createApp } from "./http/app.js";
 import { databasePool, verifyDatabaseConnection } from "./infrastructure/database/pool.js";
 import { logger } from "./infrastructure/logger.js";
+import { redis, verifyRedisConnection } from "./infrastructure/redis.js";
 import { IncidentRepository } from "./repositories/incident.repository.js";
+import { SettingsRepository } from "./repositories/settings.repository.js";
 import { MonitoringService } from "./services/monitoring.service.js";
-import { OpenAIAlertGenerator } from "./ai/openai-alert-generator.js";
-import OpenAI from "openai";
+import { EmailService } from "./services/email.service.js";
+import { DynamicAlertGenerator } from "./ai/dynamic-alert-generator.js";
 
 async function start(): Promise<void> {
   await verifyDatabaseConnection();
+  await verifyRedisConnection();
+
   const incidentRepository = new IncidentRepository(databasePool);
-  const alertGenerator = llmConfig.provider === "openai" && llmConfig.apiKey
-    ? new OpenAIAlertGenerator(new OpenAI({ apiKey: llmConfig.apiKey, timeout: llmConfig.timeoutMs }), llmConfig.model)
-    : undefined;
+  const settingsRepository = new SettingsRepository(databasePool);
+
+  const alertGenerator = new DynamicAlertGenerator(
+    settingsRepository,
+    {
+      provider: llmConfig.provider,
+      apiKey: llmConfig.apiKey,
+      model: llmConfig.model,
+      baseURL: llmConfig.baseURL,
+      timeoutMs: llmConfig.timeoutMs,
+    },
+    logger,
+  );
+
+  const emailService = new EmailService(settingsRepository, logger);
+
   const monitoringService = new MonitoringService(
     incidentRepository,
     monitoringConfig,
     alertGenerator,
     logger,
+    (incident) => void emailService.sendIncidentAlert(incident),
   );
-  const app = createApp(monitoringService, incidentRepository);
+
+  const app = createApp({
+    monitoringService,
+    incidentRepository,
+    settingsRepository,
+    redis,
+    rateLimitConfig: {
+      windowSeconds: env.RATE_LIMIT_WINDOW_SECONDS,
+      maxRequests: env.RATE_LIMIT_MAX_REQUESTS,
+    },
+  });
 
   const server = app.listen(env.PORT, () => {
-    console.log(`API Sentinel backend listening on port ${env.PORT}`);
+    logger.info({ port: env.PORT }, "API Sentinel backend listening");
   });
 
   const shutdown = async (): Promise<void> => {
+    logger.info("Shutting down gracefully");
     server.close();
+    redis.disconnect();
     await databasePool.end();
   };
 
@@ -37,6 +67,6 @@ async function start(): Promise<void> {
 }
 
 start().catch((error: unknown) => {
-  console.error("Unable to start backend", error);
+  logger.fatal({ err: error }, "Unable to start backend");
   process.exit(1);
 });

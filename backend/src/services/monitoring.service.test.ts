@@ -19,7 +19,7 @@ const existingIncident: Incident = {
   status_code: 500,
   response_time_ms: 5500,
   records_returned: 0,
-  alert_message: "AppointmentAPI triggered HTTP_FAILURE and HIGH_LATENCY and ZERO_RECORDS.",
+  alert_message: "AppointmentAPI is returning errors and responding unusually slowly and not returning any data.",
   alert_source: "FALLBACK",
   status: "ACTIVE",
   occurrence_count: 1,
@@ -64,7 +64,7 @@ describe("MonitoringService", () => {
     });
     expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({
       alertSource: "FALLBACK",
-      alertMessage: "AppointmentAPI triggered HTTP_FAILURE and HIGH_LATENCY and ZERO_RECORDS.",
+      alertMessage: "AppointmentAPI is returning errors and responding unusually slowly and not returning any data.",
     }));
   });
 
@@ -106,7 +106,7 @@ describe("MonitoringService", () => {
 
     expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({
       alertSource: "FALLBACK",
-      alertMessage: "AppointmentAPI triggered HTTP_FAILURE and HIGH_LATENCY and ZERO_RECORDS.",
+      alertMessage: "AppointmentAPI is returning errors and responding unusually slowly and not returning any data.",
     }));
   });
 });

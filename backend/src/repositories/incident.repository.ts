@@ -104,16 +104,99 @@ export class IncidentRepository {
     return result.rows[0] ? mapIncident(result.rows[0]) : null;
   }
 
-  async findActive(limit = 100): Promise<Incident[]> {
-    const result = await this.pool.query<IncidentRow>(
-      `SELECT * FROM incidents
-       WHERE status = 'ACTIVE'
-       ORDER BY last_seen_at DESC
-       LIMIT $1`,
-      [limit],
-    );
+  async findActive(limit = 20, offset = 0): Promise<{ data: Incident[]; total: number; summary: { critical: number; high: number; medium: number; affectedApis: number } }> {
+    const [rows, statsRow] = await Promise.all([
+      this.pool.query<IncidentRow>(
+        `SELECT * FROM incidents
+         WHERE status = 'ACTIVE'
+         ORDER BY last_seen_at DESC
+         LIMIT $1 OFFSET $2`,
+        [limit, offset],
+      ),
+      this.pool.query<{ total: string; critical: string; high: string; medium: string; affected_apis: string }>(
+        `SELECT
+           count(*)::text AS total,
+           count(*) FILTER (WHERE severity = 'CRITICAL')::text AS critical,
+           count(*) FILTER (WHERE severity = 'HIGH')::text AS high,
+           count(*) FILTER (WHERE severity = 'MEDIUM')::text AS medium,
+           count(DISTINCT api_name)::text AS affected_apis
+         FROM incidents WHERE status = 'ACTIVE'`,
+      ),
+    ]);
 
-    return result.rows.map(mapIncident);
+    const stats = statsRow.rows[0];
+    return {
+      data: rows.rows.map(mapIncident),
+      total: Number(stats.total),
+      summary: {
+        critical: Number(stats.critical),
+        high: Number(stats.high),
+        medium: Number(stats.medium),
+        affectedApis: Number(stats.affected_apis),
+      },
+    };
+  }
+
+  async resolve(id: string): Promise<Incident | null> {
+    const now = new Date();
+    const result = await this.pool.query<IncidentRow>(
+      `UPDATE incidents
+       SET status = 'RESOLVED', resolved_at = $2, updated_at = $2
+       WHERE id = $1 AND status = 'ACTIVE'
+       RETURNING *`,
+      [id, now],
+    );
+    return result.rows[0] ? mapIncident(result.rows[0]) : null;
+  }
+
+  async findPaginated(
+    status: "ACTIVE" | "RESOLVED" | "ALL",
+    limit = 20,
+    offset = 0,
+  ): Promise<{ data: Incident[]; total: number; summary: { active: number; critical: number; high: number; medium: number; affectedApis: number; resolved: number } }> {
+    const statusClause = status === "ALL" ? "" : "WHERE status = $3";
+    const params = status === "ALL" ? [limit, offset] : [limit, offset, status];
+
+    const countClause = status === "ALL" ? "" : "WHERE status = $1";
+    const countParams = status === "ALL" ? [] : [status];
+
+    const [rows, countRow, globalStatsRow] = await Promise.all([
+      this.pool.query<IncidentRow>(
+        `SELECT * FROM incidents
+         ${statusClause}
+         ORDER BY created_at DESC, last_seen_at DESC
+         LIMIT $1 OFFSET $2`,
+        params,
+      ),
+      this.pool.query<{ total: string }>(
+        `SELECT count(*)::text AS total FROM incidents ${countClause}`,
+        countParams,
+      ),
+      this.pool.query<{ active: string; resolved: string; critical: string; high: string; medium: string; affected_apis: string }>(
+        `SELECT
+           count(*) FILTER (WHERE status = 'ACTIVE')::text AS active,
+           count(*) FILTER (WHERE status = 'RESOLVED')::text AS resolved,
+           count(*) FILTER (WHERE severity = 'CRITICAL' AND status = 'ACTIVE')::text AS critical,
+           count(*) FILTER (WHERE severity = 'HIGH' AND status = 'ACTIVE')::text AS high,
+           count(*) FILTER (WHERE severity = 'MEDIUM' AND status = 'ACTIVE')::text AS medium,
+           count(DISTINCT api_name) FILTER (WHERE status = 'ACTIVE')::text AS affected_apis
+         FROM incidents`,
+      ),
+    ]);
+
+    const globalStats = globalStatsRow.rows[0];
+    return {
+      data: rows.rows.map(mapIncident),
+      total: Number(countRow.rows[0].total),
+      summary: {
+        active: Number(globalStats.active),
+        resolved: Number(globalStats.resolved),
+        critical: Number(globalStats.critical),
+        high: Number(globalStats.high),
+        medium: Number(globalStats.medium),
+        affectedApis: Number(globalStats.affected_apis),
+      },
+    };
   }
 
   async findById(id: string): Promise<Incident | null> {

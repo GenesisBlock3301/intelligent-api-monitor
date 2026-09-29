@@ -20,8 +20,15 @@ export type MonitoringResult =
     severity: Severity;
   };
 
+const ANOMALY_DESCRIPTIONS: Record<string, string> = {
+  HTTP_FAILURE: "returning errors",
+  HIGH_LATENCY: "responding unusually slowly",
+  ZERO_RECORDS: "not returning any data",
+};
+
 function createFallbackAlertMessage(event: ApiHealthEvent, anomalyTypes: readonly DetectedAnomaly["type"][]): string {
-  return `${event.api_name} triggered ${anomalyTypes.join(" and ")}.`;
+  const issues = anomalyTypes.map((t) => ANOMALY_DESCRIPTIONS[t] ?? t).join(" and ");
+  return `${event.api_name} is ${issues}.`;
 }
 
 interface ProcessingContext {
@@ -34,6 +41,7 @@ export class MonitoringService {
     private readonly detectorConfig: AnomalyDetectorConfig,
     private readonly alertGenerator?: AlertGenerator,
     private readonly logger?: Logger,
+    private readonly onIncidentCreated?: (incident: Incident) => void,
   ) {}
 
   async process(event: ApiHealthEvent, context: ProcessingContext = {}): Promise<MonitoringResult> {
@@ -101,6 +109,8 @@ export class MonitoringService {
       severity,
       anomaly_types: anomalyTypes,
     });
+
+    this.onIncidentCreated?.(incident);
 
     return {
       kind: "ANOMALY",

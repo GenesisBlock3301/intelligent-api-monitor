@@ -5,9 +5,11 @@ import { OpenAIAlertGenerator } from "./openai-alert-generator.js";
 
 describe("OpenAIAlertGenerator", () => {
   it("sends structured facts and returns the generated alert text", async () => {
-    const create = vi.fn().mockResolvedValue({ output_text: "AppointmentAPI requires investigation." });
-    const client = { responses: { create } } as unknown as OpenAI;
-    const generator = new OpenAIAlertGenerator(client, "gpt-5-mini");
+    const create = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: "AppointmentAPI requires investigation." } }],
+    });
+    const client = { chat: { completions: { create } } } as unknown as OpenAI;
+    const generator = new OpenAIAlertGenerator(client, "deepseek-chat");
 
     await expect(generator.generate({
       event: { api_name: "AppointmentAPI", status_code: 500, response_time_ms: 5500, records_returned: 0 },
@@ -16,14 +18,18 @@ describe("OpenAIAlertGenerator", () => {
     })).resolves.toBe("AppointmentAPI requires investigation.");
 
     expect(create).toHaveBeenCalledWith(expect.objectContaining({
-      model: "gpt-5-mini",
-      input: expect.stringContaining('"status_code":500'),
+      model: "deepseek-chat",
+      messages: expect.arrayContaining([
+        expect.objectContaining({ role: "user", content: expect.stringContaining('"status_code":500') }),
+      ]),
     }));
   });
 
   it("rejects an empty provider response so the service can fall back", async () => {
-    const client = { responses: { create: vi.fn().mockResolvedValue({ output_text: "  " }) } } as unknown as OpenAI;
-    const generator = new OpenAIAlertGenerator(client, "gpt-5-mini");
+    const client = {
+      chat: { completions: { create: vi.fn().mockResolvedValue({ choices: [{ message: { content: "  " } }] }) } },
+    } as unknown as OpenAI;
+    const generator = new OpenAIAlertGenerator(client, "deepseek-chat");
 
     await expect(generator.generate({
       event: { api_name: "AppointmentAPI", status_code: 500, response_time_ms: 5500, records_returned: 0 },
