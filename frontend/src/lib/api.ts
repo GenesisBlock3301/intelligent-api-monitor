@@ -119,6 +119,37 @@ export async function submitTestEvent(event: TestEventInput): Promise<MonitorRes
   return await response.json() as MonitorResponse;
 }
 
+const LIVE_DEMO_SCENARIOS: TestEventInput[] = [
+  { api_name: "PatientDataAPI", status_code: 500, response_time_ms: 4200, records_returned: 0 },
+  { api_name: "BillingAPI", status_code: 200, response_time_ms: 7800, records_returned: 12 },
+  { api_name: "SchedulingAPI", status_code: 200, response_time_ms: 320, records_returned: 0 },
+  { api_name: "AppointmentAPI", status_code: 503, response_time_ms: 9200, records_returned: 0 },
+  { api_name: "ClaimsAPI", status_code: 500, response_time_ms: 1100, records_returned: 5 },
+  { api_name: "LabResultsAPI", status_code: 200, response_time_ms: 6500, records_returned: 0 },
+];
+
+export function startLiveDemo(
+  onEvent: (index: number, total: number) => void,
+  onDone: () => void,
+): () => void {
+  let cancelled = false;
+  const total = LIVE_DEMO_SCENARIOS.length;
+
+  (async () => {
+    for (let i = 0; i < total; i++) {
+      if (cancelled) return;
+      await submitTestEvent(LIVE_DEMO_SCENARIOS[i]);
+      onEvent(i + 1, total);
+      if (i < total - 1 && !cancelled) {
+        await new Promise((r) => setTimeout(r, 2500));
+      }
+    }
+    if (!cancelled) onDone();
+  })();
+
+  return () => { cancelled = true; };
+}
+
 export async function resolveIncident(id: string): Promise<Incident> {
   const response = await fetch(`${apiBaseUrl}/alerts/${id}/resolve`, { method: "PATCH" });
 

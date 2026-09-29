@@ -14,6 +14,7 @@ interface IncidentTableProps {
   pageSizeOptions: readonly number[];
   onPageSizeChange: (size: number) => void;
   showStatus: boolean;
+  showResolvedAt: boolean;
 }
 
 function relativeTime(isoDate: string): string {
@@ -49,7 +50,7 @@ function pageNumbers(current: number, total: number): (number | "...")[] {
   return pages;
 }
 
-export function IncidentTable({ incidents, selectedIncidentId, onSelect, pagination, onPageChange, pageSize, pageSizeOptions, onPageSizeChange, showStatus }: IncidentTableProps) {
+export function IncidentTable({ incidents, selectedIncidentId, onSelect, pagination, onPageChange, pageSize, pageSizeOptions, onPageSizeChange, showStatus, showResolvedAt }: IncidentTableProps) {
   const { page, total, totalPages, limit } = pagination;
   const from = (page - 1) * limit + 1;
   const to = Math.min(page * limit, total);
@@ -66,6 +67,7 @@ export function IncidentTable({ incidents, selectedIncidentId, onSelect, paginat
               <th scope="col">Anomaly types</th>
               <th scope="col">Occurrences</th>
               <th scope="col">Last seen</th>
+              {showResolvedAt && <th scope="col">Resolved at</th>}
               {showStatus && <th scope="col">Status</th>}
             </tr>
           </thead>
@@ -85,6 +87,11 @@ export function IncidentTable({ incidents, selectedIncidentId, onSelect, paginat
                 <td><span className="anomaly-text" title={incident.anomaly_types.join(", ")}>{incident.anomaly_types.join(" · ")}</span></td>
                 <td>{incident.occurrence_count}</td>
                 <td title={new Date(incident.last_seen_at).toLocaleString()}>{relativeTime(incident.last_seen_at)}</td>
+                {showResolvedAt && (
+                  <td title={incident.resolved_at ? new Date(incident.resolved_at).toLocaleString() : ""}>
+                    {incident.resolved_at ? relativeTime(incident.resolved_at) : "—"}
+                  </td>
+                )}
                 {showStatus && (
                   <td>
                     <span className={`status-badge ${incident.status === "RESOLVED" ? "status-resolved" : "status-active"}`}>

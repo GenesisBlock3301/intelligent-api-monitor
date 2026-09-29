@@ -34,7 +34,7 @@ describe("detectAnomalies", () => {
     ]);
   });
 
-  it("returns all triggered anomalies in deterministic order", () => {
+  it("does not flag ZERO_RECORDS on error status codes (HTTP_FAILURE covers it)", () => {
     const anomalies = detectAnomalies({
       ...healthyEvent,
       status_code: 503,
@@ -42,6 +42,17 @@ describe("detectAnomalies", () => {
       records_returned: 0,
     }, config);
 
-    expect(anomalyTypes(anomalies)).toEqual(["HTTP_FAILURE", "HIGH_LATENCY", "ZERO_RECORDS"]);
+    expect(anomalyTypes(anomalies)).toEqual(["HTTP_FAILURE", "HIGH_LATENCY"]);
+  });
+
+  it("returns all triggered anomalies on a successful status with multiple issues", () => {
+    const anomalies = detectAnomalies({
+      ...healthyEvent,
+      status_code: 200,
+      response_time_ms: 5500,
+      records_returned: 0,
+    }, config);
+
+    expect(anomalyTypes(anomalies)).toEqual(["HIGH_LATENCY", "ZERO_RECORDS"]);
   });
 });

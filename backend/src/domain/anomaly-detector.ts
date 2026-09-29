@@ -29,7 +29,7 @@ export function detectAnomalies(
     });
   }
 
-  if (event.records_returned === 0) {
+  if (event.records_returned === 0 && event.status_code >= 200 && event.status_code < 400) {
     anomalies.push({ type: "ZERO_RECORDS", evidence: { records_returned: event.records_returned } });
   }
 

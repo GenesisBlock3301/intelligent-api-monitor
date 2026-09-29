@@ -8,8 +8,8 @@ describe("determineSeverity", () => {
     [["HIGH_LATENCY"], "MEDIUM"],
     [["ZERO_RECORDS"], "MEDIUM"],
     [["HTTP_FAILURE"], "HIGH"],
-    [["HTTP_FAILURE", "HIGH_LATENCY"], "HIGH"],
-    [["HTTP_FAILURE", "ZERO_RECORDS"], "CRITICAL"],
+    [["HTTP_FAILURE", "ZERO_RECORDS"], "HIGH"],
+    [["HTTP_FAILURE", "HIGH_LATENCY"], "CRITICAL"],
     [["HTTP_FAILURE", "HIGH_LATENCY", "ZERO_RECORDS"], "CRITICAL"],
   ] as const)("classifies %j as %s", (anomalies, expectedSeverity) => {
     expect(determineSeverity(anomalies)).toBe(expectedSeverity);

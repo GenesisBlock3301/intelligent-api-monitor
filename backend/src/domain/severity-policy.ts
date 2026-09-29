@@ -7,7 +7,7 @@ export function determineSeverity(anomalyTypes: readonly AnomalyType[]): Severit
 
   const anomalies = new Set(anomalyTypes);
 
-  if (anomalies.has("HTTP_FAILURE") && anomalies.has("ZERO_RECORDS")) {
+  if (anomalies.has("HTTP_FAILURE") && anomalies.has("HIGH_LATENCY")) {
     return "CRITICAL";
   }
 

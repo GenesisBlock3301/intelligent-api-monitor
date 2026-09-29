@@ -164,7 +164,7 @@ export class IncidentRepository {
       this.pool.query<IncidentRow>(
         `SELECT * FROM incidents
          ${statusClause}
-         ORDER BY created_at DESC, last_seen_at DESC
+         ORDER BY last_seen_at DESC, created_at DESC
          LIMIT $1 OFFSET $2`,
         params,
       ),

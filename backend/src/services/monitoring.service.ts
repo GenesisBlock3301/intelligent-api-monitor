@@ -128,12 +128,13 @@ export class MonitoringService {
     severity: Severity,
     context: ProcessingContext,
   ): Promise<{ message: string; source: "LLM" | "FALLBACK" }> {
-    if (!this.alertGenerator) {
+    const hasHttpFailure = anomalyTypes.includes("HTTP_FAILURE");
+    if (!this.alertGenerator || !hasHttpFailure) {
       this.logger?.info({
         event: "fallback_used",
         request_id: context.requestId,
         api_name: event.api_name,
-        reason: "llm_not_configured",
+        reason: !this.alertGenerator ? "llm_not_configured" : "non_error_anomaly",
       });
       return { message: createFallbackAlertMessage(event, anomalyTypes), source: "FALLBACK" };
     }

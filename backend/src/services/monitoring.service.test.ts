@@ -12,14 +12,14 @@ const event = {
 
 const existingIncident: Incident = {
   id: "incident-1",
-  fingerprint: "AppointmentAPI:HIGH_LATENCY|HTTP_FAILURE|ZERO_RECORDS",
+  fingerprint: "AppointmentAPI:HIGH_LATENCY|HTTP_FAILURE",
   api_name: "AppointmentAPI",
-  anomaly_types: ["HTTP_FAILURE", "HIGH_LATENCY", "ZERO_RECORDS"],
+  anomaly_types: ["HTTP_FAILURE", "HIGH_LATENCY"],
   severity: "CRITICAL",
   status_code: 500,
   response_time_ms: 5500,
   records_returned: 0,
-  alert_message: "AppointmentAPI is returning errors and responding unusually slowly and not returning any data.",
+  alert_message: "AppointmentAPI is returning errors and responding unusually slowly.",
   alert_source: "FALLBACK",
   status: "ACTIVE",
   occurrence_count: 1,
@@ -60,11 +60,11 @@ describe("MonitoringService", () => {
       kind: "ANOMALY",
       action: "CREATED",
       severity: "CRITICAL",
-      fingerprint: "AppointmentAPI:HIGH_LATENCY|HTTP_FAILURE|ZERO_RECORDS",
+      fingerprint: "AppointmentAPI:HIGH_LATENCY|HTTP_FAILURE",
     });
     expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({
       alertSource: "FALLBACK",
-      alertMessage: "AppointmentAPI is returning errors and responding unusually slowly and not returning any data.",
+      alertMessage: "AppointmentAPI is returning errors and responding unusually slowly.",
     }));
   });
 
@@ -106,7 +106,7 @@ describe("MonitoringService", () => {
 
     expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({
       alertSource: "FALLBACK",
-      alertMessage: "AppointmentAPI is returning errors and responding unusually slowly and not returning any data.",
+      alertMessage: "AppointmentAPI is returning errors and responding unusually slowly.",
     }));
   });
 });

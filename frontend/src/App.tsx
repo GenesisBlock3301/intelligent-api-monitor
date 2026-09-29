@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Boxes, FlaskConical, RefreshCw, Settings } from "lucide-react";
+import { Activity, AlertTriangle, Boxes, FlaskConical, Radio, RefreshCw, Settings, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { IncidentTable } from "./components/IncidentTable";
@@ -6,7 +6,7 @@ import { IncidentDetailsSheet } from "./components/IncidentDetailsSheet";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { TestEventForm } from "./components/TestEventForm";
 import { SummaryCard } from "./components/SummaryCard";
-import { fetchAlerts, resolveIncident, type AlertsResponse, type AlertsSummary, type Incident, type Pagination, type StatusFilter } from "./lib/api";
+import { fetchAlerts, resolveIncident, startLiveDemo, type AlertsResponse, type AlertsSummary, type Incident, type Pagination, type StatusFilter } from "./lib/api";
 import "./App.css";
 
 function BrandMark() {
@@ -46,6 +46,8 @@ function App() {
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [testFormOpen, setTestFormOpen] = useState(false);
+  const [demoProgress, setDemoProgress] = useState<string | null>(null);
+  const demoCancelRef = useRef<(() => void) | null>(null);
   const pageRef = useRef(1);
   const pageSizeRef = useRef(pageSize);
   const statusRef = useRef(statusFilter);
@@ -107,24 +109,54 @@ function App() {
     }
   };
 
+  const handleStartDemo = () => {
+    if (demoCancelRef.current) return;
+    setDemoProgress("0/6");
+    demoCancelRef.current = startLiveDemo(
+      (index, total) => {
+        setDemoProgress(`${index}/${total}`);
+        void loadAlerts();
+      },
+      () => {
+        setDemoProgress(null);
+        demoCancelRef.current = null;
+        void loadAlerts();
+      },
+    );
+  };
+
+  const handleStopDemo = () => {
+    demoCancelRef.current?.();
+    demoCancelRef.current = null;
+    setDemoProgress(null);
+  };
+
   const selectedIncident = incidents.find((i) => i.id === selectedIncidentId) ?? null;
 
   return (
     <>
       <nav className="navbar">
         <div className="navbar-inner">
-          <div className="navbar-brand">
+          <div className="navbar-brand" title="API Sentinel — Intelligent API Monitoring Dashboard">
             <BrandMark />
             <span className="navbar-title">API Sentinel</span>
           </div>
           <div className="navbar-actions">
-            <div className="navbar-status"><span aria-hidden="true" /> Monitoring</div>
+            {demoProgress ? (
+              <button className="navbar-demo-btn navbar-demo-active" type="button" onClick={handleStopDemo} title="Stop the live simulation">
+                <Square size={13} aria-hidden="true" /> Auto Simulation <span className="demo-progress">{demoProgress}</span>
+              </button>
+            ) : (
+              <button className="navbar-demo-btn" type="button" onClick={handleStartDemo} title="Run a realistic incident sequence automatically — fires 6 health events in series to demo the full monitoring pipeline">
+                <Radio size={15} aria-hidden="true" /> Auto Simulation
+              </button>
+            )}
             <div className="navbar-divider" aria-hidden="true" />
-            <button className="navbar-test-btn" type="button" onClick={() => setTestFormOpen(true)}>
-              <FlaskConical size={15} aria-hidden="true" /> Test Event
+            <button className="navbar-test-btn" type="button" onClick={() => setTestFormOpen(true)} title="Manually craft and send a single API health event to test anomaly detection rules">
+              <FlaskConical size={15} aria-hidden="true" /><span className="btn-label">Manual Test</span>
             </button>
-            <button className="navbar-icon-btn" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings">
-              <Settings size={18} aria-hidden="true" />
+            <button className="navbar-settings-btn" type="button" onClick={() => setSettingsOpen(true)} title="Configure LLM provider, email alerts, and monitoring thresholds">
+              <Settings size={15} aria-hidden="true" /> Settings
             </button>
           </div>
         </div>
@@ -158,7 +190,7 @@ function App() {
                   </button>
                 ))}
               </div>
-              <button className="refresh-button" type="button" onClick={() => { setIsLoading(true); void loadAlerts(); }}>
+              <button className="refresh-button" type="button" onClick={() => { setIsLoading(true); void loadAlerts(); }} title="Fetch the latest incidents now instead of waiting for the next auto-refresh">
                 <RefreshCw size={16} aria-hidden="true" /> Refresh
               </button>
             </div>
@@ -191,6 +223,7 @@ function App() {
               pageSizeOptions={PAGE_SIZE_OPTIONS}
               onPageSizeChange={changePageSize}
               showStatus={statusFilter === "ALL"}
+              showResolvedAt={statusFilter === "RESOLVED" || statusFilter === "ALL"}
             />
           )}
         </section>
