@@ -199,6 +199,11 @@ export class IncidentRepository {
     };
   }
 
+  async deleteAll(): Promise<number> {
+    const result = await this.pool.query("DELETE FROM incidents");
+    return result.rowCount ?? 0;
+  }
+
   async findById(id: string): Promise<Incident | null> {
     const result = await this.pool.query<IncidentRow>("SELECT * FROM incidents WHERE id = $1", [id]);
     return result.rows[0] ? mapIncident(result.rows[0]) : null;

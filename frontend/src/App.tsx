@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Boxes, FlaskConical, Radio, RefreshCw, Settings, Square } from "lucide-react";
+import { Activity, AlertTriangle, Boxes, Database, FlaskConical, Radio, RefreshCw, Settings, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { IncidentTable } from "./components/IncidentTable";
@@ -6,7 +6,7 @@ import { IncidentDetailsSheet } from "./components/IncidentDetailsSheet";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { TestEventForm } from "./components/TestEventForm";
 import { SummaryCard } from "./components/SummaryCard";
-import { fetchAlerts, resolveIncident, startLiveDemo, type AlertsResponse, type AlertsSummary, type Incident, type Pagination, type StatusFilter } from "./lib/api";
+import { deleteAllIncidents, fetchAlerts, resolveIncident, startSeed, startLiveDemo, type AlertsResponse, type AlertsSummary, type Incident, type Pagination, type StatusFilter } from "./lib/api";
 import "./App.css";
 
 function BrandMark() {
@@ -47,6 +47,11 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [testFormOpen, setTestFormOpen] = useState(false);
   const [demoProgress, setDemoProgress] = useState<string | null>(null);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [seedExistsOpen, setSeedExistsOpen] = useState(false);
+  const [seedProgress, setSeedProgress] = useState<string | null>(null);
+  const seedCancelRef = useRef<(() => void) | null>(null);
+  const [resetting, setResetting] = useState(false);
   const demoCancelRef = useRef<(() => void) | null>(null);
   const pageRef = useRef(1);
   const pageSizeRef = useRef(pageSize);
@@ -131,6 +136,54 @@ function App() {
     setDemoProgress(null);
   };
 
+  const handleRunSeed = () => {
+    if (seedCancelRef.current) return;
+    if (summary.active + summary.resolved > 0) {
+      setSeedExistsOpen(true);
+      return;
+    }
+    startSeeding();
+  };
+
+  const startSeeding = () => {
+    setSeedExistsOpen(false);
+    setSeedProgress("0/100");
+    seedCancelRef.current = startSeed(
+      (completed, total) => {
+        setSeedProgress(`${completed}/${total}`);
+        void loadAlerts();
+      },
+      () => {
+        setSeedProgress(null);
+        seedCancelRef.current = null;
+        void loadAlerts();
+      },
+    );
+  };
+
+  const handleStopSeed = () => {
+    seedCancelRef.current?.();
+    seedCancelRef.current = null;
+    setSeedProgress(null);
+  };
+
+  const handleReset = async () => {
+    setResetting(true);
+    try {
+      await deleteAllIncidents();
+      setResetConfirmOpen(false);
+      setSelectedIncidentId(null);
+      setIncidents([]);
+      setSummary({ active: 0, resolved: 0, critical: 0, high: 0, medium: 0, affectedApis: 0 });
+      setPagination((prev) => ({ ...prev, total: 0, totalPages: 1, page: 1 }));
+      void loadAlerts(1);
+    } catch {
+      setError("Failed to delete incidents.");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const selectedIncident = incidents.find((i) => i.id === selectedIncidentId) ?? null;
 
   return (
@@ -154,6 +207,18 @@ function App() {
             <div className="navbar-divider" aria-hidden="true" />
             <button className="navbar-test-btn" type="button" onClick={() => setTestFormOpen(true)} title="Manually craft and send a single API health event to test anomaly detection rules">
               <FlaskConical size={15} aria-hidden="true" /><span className="btn-label">Manual Test</span>
+            </button>
+            {seedProgress ? (
+              <button className="navbar-demo-btn navbar-demo-active" type="button" onClick={handleStopSeed} title="Stop seeding">
+                <Square size={13} aria-hidden="true" /> Seeding <span className="demo-progress">{seedProgress}</span>
+              </button>
+            ) : (
+              <button className="navbar-test-btn" type="button" onClick={handleRunSeed} title="Populate 100 sample incidents — added progressively so you can watch them appear">
+                <Database size={15} aria-hidden="true" /><span className="btn-label">Run Seed</span>
+              </button>
+            )}
+            <button className="navbar-reset-btn" type="button" onClick={() => setResetConfirmOpen(true)} title="Delete all incidents and start fresh">
+              <Trash2 size={15} aria-hidden="true" /><span className="btn-label">Reset</span>
             </button>
             <button className="navbar-settings-btn" type="button" onClick={() => setSettingsOpen(true)} title="Configure LLM provider, email alerts, and monitoring thresholds">
               <Settings size={15} aria-hidden="true" /> Settings
@@ -231,6 +296,32 @@ function App() {
       <IncidentDetailsSheet incident={selectedIncident} onClose={() => setSelectedIncidentId(null)} onResolve={handleResolve} />
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <TestEventForm open={testFormOpen} onClose={() => setTestFormOpen(false)} onSubmitted={() => void loadAlerts()} />
+      {resetConfirmOpen && (
+        <div className="confirm-overlay" onClick={() => setResetConfirmOpen(false)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Reset All Incidents</h3>
+            <p>This will permanently delete all incidents. This action cannot be undone.</p>
+            <div className="confirm-actions">
+              <button className="confirm-cancel" type="button" onClick={() => setResetConfirmOpen(false)} disabled={resetting}>Cancel</button>
+              <button className="confirm-delete" type="button" onClick={handleReset} disabled={resetting}>
+                {resetting ? <><RefreshCw size={14} className="spin-icon" /> Deleting...</> : "Delete All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {seedExistsOpen && (
+        <div className="confirm-overlay" onClick={() => setSeedExistsOpen(false)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Seed Data Exists</h3>
+            <p>There are already {summary.active + summary.resolved} incidents in the system. Reset first to start fresh, or seed anyway to add more data.</p>
+            <div className="confirm-actions">
+              <button className="confirm-cancel" type="button" onClick={() => setSeedExistsOpen(false)}>Cancel</button>
+              <button className="confirm-seed" type="button" onClick={startSeeding}>Seed Anyway</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

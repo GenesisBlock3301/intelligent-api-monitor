@@ -150,6 +150,65 @@ export function startLiveDemo(
   return () => { cancelled = true; };
 }
 
+export async function deleteAllIncidents(): Promise<{ deleted: number }> {
+  const response = await fetch(`${apiBaseUrl}/alerts`, { method: "DELETE" });
+  if (!response.ok) throw new Error(`Delete request failed with status ${response.status}`);
+  return await response.json() as { deleted: number };
+}
+
+const SEED_API_NAMES = [
+  "PatientDataAPI", "ClaimsAPI", "BillingAPI", "SchedulingAPI", "AppointmentAPI",
+  "LabResultsAPI", "PharmacyAPI", "InsuranceAPI", "AuthServiceAPI", "NotificationAPI",
+  "ReportingAPI", "AuditLogAPI", "UserProfileAPI", "InventoryAPI", "PaymentGatewayAPI",
+  "DocumentStorageAPI", "AnalyticsAPI", "SearchAPI", "MessagingAPI", "ComplianceAPI",
+];
+
+const SEED_TEMPLATES: TestEventInput[] = [
+  { api_name: "", status_code: 500, response_time_ms: 800, records_returned: 5 },
+  { api_name: "", status_code: 200, response_time_ms: 5500, records_returned: 30 },
+  { api_name: "", status_code: 200, response_time_ms: 400, records_returned: 0 },
+  { api_name: "", status_code: 503, response_time_ms: 8200, records_returned: 0 },
+  { api_name: "", status_code: 200, response_time_ms: 6000, records_returned: 0 },
+];
+
+function generateSeedScenarios(): TestEventInput[] {
+  const scenarios: TestEventInput[] = [];
+  for (let i = 0; i < 100; i++) {
+    const api = SEED_API_NAMES[Math.floor(i / 5)];
+    const template = SEED_TEMPLATES[i % 5];
+    const variance = (i * 37) % 500;
+    scenarios.push({ ...template, api_name: api, response_time_ms: template.response_time_ms + variance });
+  }
+  return scenarios;
+}
+
+export function startSeed(
+  onProgress: (completed: number, total: number) => void,
+  onDone: () => void,
+): () => void {
+  let cancelled = false;
+  const scenarios = generateSeedScenarios();
+  const total = scenarios.length;
+  const batchSize = 5;
+
+  (async () => {
+    for (let i = 0; i < total; i += batchSize) {
+      if (cancelled) return;
+      const batch = scenarios.slice(i, i + batchSize);
+      const response = await fetch(`${apiBaseUrl}/monitor`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(batch),
+      });
+      if (!response.ok) throw new Error(`Seed batch failed with status ${response.status}`);
+      onProgress(Math.min(i + batchSize, total), total);
+    }
+    if (!cancelled) onDone();
+  })();
+
+  return () => { cancelled = true; };
+}
+
 export async function resolveIncident(id: string): Promise<Incident> {
   const response = await fetch(`${apiBaseUrl}/alerts/${id}/resolve`, { method: "PATCH" });
 

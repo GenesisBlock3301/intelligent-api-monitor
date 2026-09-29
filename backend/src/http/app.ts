@@ -10,12 +10,12 @@ import { createMonitorRouter } from "./routes/monitor.routes.js";
 import { createAlertsRouter } from "./routes/alerts.routes.js";
 import { createSettingsRouter } from "./routes/settings.routes.js";
 import { errorHandler } from "./middleware/error-handler.js";
-import { createRateLimiter, type RateLimitConfig } from "./middleware/rate-limiter.js";
+import type { RateLimitConfig } from "./middleware/rate-limiter.js";
 import type { MonitoringService } from "../services/monitoring.service.js";
 
 interface AppDependencies {
   monitoringService: MonitoringService;
-  incidentRepository: Pick<IncidentRepository, "findPaginated" | "resolve">;
+  incidentRepository: Pick<IncidentRepository, "findPaginated" | "resolve" | "deleteAll">;
   settingsRepository: SettingsRepository;
   redis: Redis;
   rateLimitConfig: RateLimitConfig;
@@ -27,12 +27,11 @@ export function createApp({ monitoringService, incidentRepository, settingsRepos
   app.use(pinoHttp({ logger, autoLogging: true }));
   app.use(cors());
   app.use(express.json({ limit: "1mb" }));
-  app.use(createRateLimiter(redis, rateLimitConfig));
 
   app.get("/health", (_request, response) => {
     response.status(200).json({ status: "ok" });
   });
-  app.use(createMonitorRouter(monitoringService, redis));
+  app.use(createMonitorRouter(monitoringService, redis, rateLimitConfig));
   app.use(createAlertsRouter(incidentRepository, redis));
   app.use(createSettingsRouter(settingsRepository));
   app.use(errorHandler);

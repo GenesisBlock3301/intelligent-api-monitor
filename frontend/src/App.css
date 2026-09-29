@@ -104,6 +104,28 @@
 
 .navbar-test-btn:hover { background: rgba(99, 102, 241, 0.22); }
 .navbar-test-btn:focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; }
+.navbar-test-btn:disabled, .navbar-reset-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.spin-icon { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.navbar-reset-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 8px;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.08);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.navbar-reset-btn:hover { background: rgba(239, 68, 68, 0.18); }
+.navbar-reset-btn:focus-visible { outline: 2px solid #ef4444; outline-offset: 2px; }
 
 .navbar-settings-btn {
   display: flex;
@@ -628,6 +650,78 @@ td strong { display: block; color: #1e293b; }
 .test-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .test-submit-btn:focus-visible { outline: 2px solid #4338ca; outline-offset: 2px; }
 
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  animation: overlay-in 150ms ease;
+}
+.confirm-dialog {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px;
+  max-width: 420px;
+  width: calc(100% - 32px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+.confirm-dialog h3 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  color: #1e293b;
+}
+.confirm-dialog p {
+  margin: 0 0 24px;
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.confirm-cancel {
+  padding: 9px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.confirm-cancel:hover { background: #f8fafc; }
+.confirm-delete {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #ef4444;
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.confirm-delete:hover { background: #dc2626; }
+.confirm-seed {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #6366f1;
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.confirm-seed:hover { background: #4f46e5; }
+.confirm-delete:disabled, .confirm-cancel:disabled { opacity: 0.5; cursor: not-allowed; }
+.confirm-delete { display: flex; align-items: center; gap: 6px; }
+
 @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sheet-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
@@ -687,8 +781,10 @@ td strong { display: block; color: #1e293b; }
 @media (max-width: 420px) {
   .navbar-inner { height: 48px; gap: 8px; }
   .navbar-title { font-size: 0.88rem; }
-  .navbar-test-btn .btn-label { display: none; }
-  .navbar-test-btn { padding: 8px; border-radius: 8px; }
+  .navbar-test-btn .btn-label,
+  .navbar-reset-btn .btn-label { display: none; }
+  .navbar-test-btn,
+  .navbar-reset-btn { padding: 8px; border-radius: 8px; }
 
   .dashboard-content {
     padding: 14px max(12px, env(safe-area-inset-left)) calc(40px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-right));

@@ -39,6 +39,7 @@ export function createRateLimiter(redis: Redis, config: RateLimitConfig): Reques
           limit: maxRequests,
         }, "Rate limit exceeded");
 
+        response.setHeader("Retry-After", windowSeconds);
         response.status(429).json({
           error: "RATE_LIMIT_EXCEEDED",
           message: `Too many requests. Limit: ${maxRequests} per ${windowSeconds}s`,

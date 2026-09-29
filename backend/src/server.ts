@@ -37,7 +37,11 @@ async function start(): Promise<void> {
     monitoringConfig,
     alertGenerator,
     logger,
-    (incident) => void emailService.sendIncidentAlert(incident),
+    (incident) => {
+      emailService.sendIncidentAlert(incident).catch((error: unknown) => {
+        logger.error({ err: error, incident_id: incident.id }, "Email notification failed");
+      });
+    },
   );
 
   const app = createApp({
@@ -65,6 +69,15 @@ async function start(): Promise<void> {
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
 }
+
+process.on("unhandledRejection", (reason: unknown) => {
+  logger.error({ err: reason }, "Unhandled promise rejection");
+});
+
+process.on("uncaughtException", (error: Error) => {
+  logger.fatal({ err: error }, "Uncaught exception — shutting down");
+  process.exit(1);
+});
 
 start().catch((error: unknown) => {
   logger.fatal({ err: error }, "Unable to start backend");

@@ -17,3 +17,17 @@ export async function verifyRedisConnection(): Promise<void> {
   await redis.ping();
   logger.info("Redis connection verified");
 }
+
+export async function deleteKeysByPattern(client: Redis, pattern: string): Promise<number> {
+  let cursor = "0";
+  let deleted = 0;
+  do {
+    const [nextCursor, keys] = await client.scan(cursor, "MATCH", pattern, "COUNT", 100);
+    cursor = nextCursor;
+    if (keys.length > 0) {
+      await client.del(...keys);
+      deleted += keys.length;
+    }
+  } while (cursor !== "0");
+  return deleted;
+}

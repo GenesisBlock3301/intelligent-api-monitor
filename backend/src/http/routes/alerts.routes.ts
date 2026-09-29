@@ -2,15 +2,11 @@ import { Router } from "express";
 import type { Redis } from "ioredis";
 
 import type { IncidentRepository } from "../../repositories/incident.repository.js";
+import { deleteKeysByPattern } from "../../infrastructure/redis.js";
 
-type AlertStore = Pick<IncidentRepository, "findPaginated" | "resolve">;
+type AlertStore = Pick<IncidentRepository, "findPaginated" | "resolve" | "deleteAll">;
 
 const CACHE_TTL_SECONDS = 5;
-
-async function invalidateAlertsCache(redis: Redis): Promise<void> {
-  const keys = await redis.keys("alerts:*");
-  if (keys.length > 0) await redis.del(...keys);
-}
 
 export function createAlertsRouter(incidentRepository: AlertStore, redis: Redis): Router {
   const router = Router();
@@ -70,9 +66,22 @@ export function createAlertsRouter(incidentRepository: AlertStore, redis: Redis)
 
       request.log.info({ event: "incident_resolved", incident_id: incident.id, api_name: incident.api_name });
 
-      try { await invalidateAlertsCache(redis); } catch {}
+      try { await deleteKeysByPattern(redis, "alerts:*"); } catch {}
 
       response.status(200).json({ data: incident });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.delete("/alerts", async (request, response, next) => {
+    try {
+      const deleted = await incidentRepository.deleteAll();
+      request.log.info({ event: "all_incidents_deleted", deleted });
+
+      try { await deleteKeysByPattern(redis, "alerts:*"); } catch {}
+
+      response.status(200).json({ deleted });
     } catch (error) {
       next(error);
     }

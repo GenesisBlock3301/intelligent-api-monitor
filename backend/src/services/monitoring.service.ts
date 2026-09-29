@@ -36,6 +36,8 @@ interface ProcessingContext {
 }
 
 export class MonitoringService {
+  private readonly inFlight = new Map<string, Promise<MonitoringResult>>();
+
   constructor(
     private readonly incidentRepository: IncidentStore,
     private readonly detectorConfig: AnomalyDetectorConfig,
@@ -67,6 +69,30 @@ export class MonitoringService {
       severity,
       anomaly_types: anomalyTypes,
     });
+
+    const pending = this.inFlight.get(fingerprint);
+    if (pending) {
+      await pending.catch(() => {});
+      return this.findOrCreate(event, anomalies, anomalyTypes, severity, fingerprint, context);
+    }
+
+    const resultPromise = this.findOrCreate(event, anomalies, anomalyTypes, severity, fingerprint, context);
+    this.inFlight.set(fingerprint, resultPromise);
+    try {
+      return await resultPromise;
+    } finally {
+      this.inFlight.delete(fingerprint);
+    }
+  }
+
+  private async findOrCreate(
+    event: ApiHealthEvent,
+    anomalies: DetectedAnomaly[],
+    anomalyTypes: DetectedAnomaly["type"][],
+    severity: Severity,
+    fingerprint: string,
+    context: ProcessingContext,
+  ): Promise<MonitoringResult> {
     const activeIncident = await this.incidentRepository.findActiveByFingerprint(fingerprint);
 
     if (activeIncident) {
