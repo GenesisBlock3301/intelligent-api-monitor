@@ -6,5 +6,9 @@
 # IDE settings
 .idea/
 
+# Dependencies and generated build output
+**/node_modules/
+**/dist/
+
 # Operating-system files
 .DS_Store
