@@ -27,21 +27,13 @@ Rules:
 Good: "The CertRotator service is currently down and not returning any data. Requests are also taking significantly longer than normal."
 Bad: "CertRotatorAPI returned HTTP 500 in 6223 ms with 0 records. Anomalies: HTTP_FAILURE, HIGH_LATENCY, ZERO_RECORDS."`;
 
-interface EnvFallback {
-  provider: string;
-  apiKey?: string;
-  model: string;
-  baseURL?: string;
-  timeoutMs: number;
-}
-
 export class DynamicAlertGenerator implements AlertGenerator {
   private cachedClient: OpenAI | null = null;
   private cachedClientKey = "";
 
   constructor(
     private readonly settingsRepository: SettingsRepository,
-    private readonly envFallback: EnvFallback,
+    private readonly timeoutMs: number,
     private readonly logger?: Logger,
   ) {}
 
@@ -58,19 +50,19 @@ export class DynamicAlertGenerator implements AlertGenerator {
   async generate(context: AlertGenerationContext): Promise<string> {
     const settings = await this.settingsRepository.getAll();
 
-    const provider = settings.llm_provider || this.envFallback.provider;
-    const apiKey = settings.llm_api_key || this.envFallback.apiKey;
-    const model = settings.llm_model || this.envFallback.model;
+    const provider = settings.llm_provider;
+    const apiKey = settings.llm_api_key;
+    const model = settings.llm_model;
 
-    if (provider === "disabled" || !apiKey) {
+    if (provider === "disabled" || !provider || !apiKey || !model) {
       throw new Error("LLM not configured");
     }
 
-    const baseURL = BASE_URLS[provider] ?? this.envFallback.baseURL;
+    const baseURL = BASE_URLS[provider];
 
     this.logger?.info({ event: "llm_dynamic_call", provider, model });
 
-    const client = this.getOrCreateClient(apiKey, baseURL, this.envFallback.timeoutMs);
+    const client = this.getOrCreateClient(apiKey, baseURL, this.timeoutMs);
 
     const response = await client.chat.completions.create({
       model,

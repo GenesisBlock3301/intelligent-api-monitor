@@ -94,7 +94,7 @@ React 19 + Vite 8 + Tailwind CSS 4. No state management library — `useState`/`
 
 - **Deduplication**: Incidents are fingerprinted by `api_name + sorted anomaly types`. Same fingerprint on an active incident increments `occurrence_count` instead of creating a duplicate.
 - **Fallback alerts**: When LLM is unavailable or unconfigured, `MonitoringService` catches the error and generates a deterministic natural-language message using `ANOMALY_DESCRIPTIONS` map.
-- **Settings precedence**: `DynamicAlertGenerator` checks DB settings first, falls back to env vars (`llm.ts`). App runs fully without any LLM key or email config.
+- **LLM settings**: `DynamicAlertGenerator` reads provider, API key, and model from database settings. App runs fully without any LLM key or email config.
 - **Cache invalidation**: Redis caches paginated alerts (5s TTL, key includes status+page+limit). Cache is invalidated when POST /monitor detects anomalies or when an incident is resolved.
 - **Migrations**: Tracked in `schema_migrations` table. Files in `backend/db/migrations/` run automatically on container start.
 
@@ -104,7 +104,7 @@ PostgreSQL 16. Two tables: `incidents` (UUID PK, fingerprint, anomaly_types as J
 
 ## Environment Variables
 
-See `backend/.env.example`. Key ones: `DATABASE_URL`, `REDIS_URL`, `LLM_PROVIDER` (openai/deepseek/disabled), `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `LLM_MODEL`, `HIGH_LATENCY_THRESHOLD_MS` (default 3000).
+See `backend/.env.example`. Key ones: `DATABASE_URL`, `REDIS_URL`, `HIGH_LATENCY_THRESHOLD_MS` (default 3000), and `LLM_TIMEOUT_MS`. Configure LLM provider, API key, and model through the Settings UI.
 
 ## Testing
 

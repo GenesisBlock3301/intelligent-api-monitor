@@ -1,5 +1,4 @@
 import { env } from "./config/env.js";
-import { llmConfig } from "./config/llm.js";
 import { monitoringConfig } from "./config/monitoring.js";
 import { createApp } from "./http/app.js";
 import { databasePool, verifyDatabaseConnection } from "./infrastructure/database/pool.js";
@@ -20,13 +19,7 @@ async function start(): Promise<void> {
 
   const alertGenerator = new DynamicAlertGenerator(
     settingsRepository,
-    {
-      provider: llmConfig.provider,
-      apiKey: llmConfig.apiKey,
-      model: llmConfig.model,
-      baseURL: llmConfig.baseURL,
-      timeoutMs: llmConfig.timeoutMs,
-    },
+    env.LLM_TIMEOUT_MS,
     logger,
   );
 

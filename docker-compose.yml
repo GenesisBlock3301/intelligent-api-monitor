@@ -39,10 +39,6 @@ services:
       MAX_MONITOR_BATCH_SIZE: 100
       RATE_LIMIT_WINDOW_SECONDS: 60
       RATE_LIMIT_MAX_REQUESTS: 100
-      LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
-      LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LLM_TIMEOUT_MS: 4000
     depends_on:
       postgres:

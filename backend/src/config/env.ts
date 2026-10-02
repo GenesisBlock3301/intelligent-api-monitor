@@ -9,10 +9,6 @@ const envSchema = z.object({
   MAX_MONITOR_BATCH_SIZE: z.coerce.number().int().positive().default(100),
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(500),
-  LLM_PROVIDER: z.enum(["openai", "deepseek", "disabled"]).default("deepseek"),
-  LLM_MODEL: z.string().min(1).default("deepseek-chat"),
-  OPENAI_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
-  DEEPSEEK_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
   LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(4000),
 });
 

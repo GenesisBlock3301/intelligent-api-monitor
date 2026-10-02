@@ -78,6 +78,9 @@ The app will be available at:
 ### Run Locally (development)
 
 ```bash
+# Start the local dependencies
+docker compose up -d postgres redis
+
 # Backend
 cd backend
 cp .env.example .env
@@ -157,16 +160,12 @@ The app runs with **zero configuration** — all LLM and email settings are opti
 |---|---|---|
 | `DATABASE_URL` | `postgresql://...localhost:5432/api_sentinel` | PostgreSQL connection string |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection string |
-| `LLM_PROVIDER` | `deepseek` | LLM provider (`openai`, `deepseek`, `disabled`) |
-| `LLM_MODEL` | `deepseek-chat` | Model name |
-| `OPENAI_API_KEY` | — | OpenAI API key |
-| `DEEPSEEK_API_KEY` | — | DeepSeek API key |
 | `HIGH_LATENCY_THRESHOLD_MS` | `3000` | Latency threshold for anomaly detection |
 | `RATE_LIMIT_MAX_REQUESTS` | `100` | Max requests per window |
 
 ### Runtime Settings (via UI)
 
-LLM provider, API key, model name, email notifications — all configurable from the dashboard Settings panel. Settings stored in the database take precedence over environment variables.
+LLM provider, API key, model name, and email notifications are configured exclusively from the dashboard Settings panel. When LLM settings are absent or disabled, the system uses deterministic fallback alerts.
 
 ## Anomaly Detection Rules
 
