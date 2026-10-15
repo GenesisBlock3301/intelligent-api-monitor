@@ -92,7 +92,7 @@ CORS_ORIGINS=http://10.250.140.136:3000,http://10.250.140.136,http://localhost:3
 docker compose up -d --build
 ```
 
-`VITE_API_BASE_URL` is compiled into the frontend image, so changing it needs another build. `CORS_ORIGINS` is read when the backend container starts. Open `http://10.250.140.136:3000`. Requests from that page go to `http://10.250.140.136:4000`.
+`VITE_API_BASE_URL` is compiled into the frontend image, so changing it needs another frontend build. If that compiled value is `http://localhost:4000` and the page is opened on the VM, the dashboard calls port 4000 on the VM host instead of the viewer's computer. `CORS_ORIGINS` is read when the backend container starts. Open `http://10.250.140.136:3000`. Requests from that page go to `http://10.250.140.136:4000`.
 
 ### Run Locally (development)
 

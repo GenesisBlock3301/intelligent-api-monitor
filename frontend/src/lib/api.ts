@@ -1,3 +1,5 @@
+import { resolveApiBaseUrl } from "./api-base";
+
 export type Severity = "MEDIUM" | "HIGH" | "CRITICAL";
 export type IncidentStatus = "ACTIVE" | "RESOLVED";
 export type StatusFilter = "ACTIVE" | "RESOLVED" | "ALL";
@@ -51,7 +53,10 @@ export interface AppSettings {
   email_password: string;
 }
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
+const apiBaseUrl = resolveApiBaseUrl(
+  typeof window === "undefined" ? "http://localhost:3000" : window.location.origin,
+  import.meta.env.VITE_API_BASE_URL,
+);
 
 export async function fetchAlerts(page = 1, limit = 20, status: StatusFilter = "ACTIVE", signal?: AbortSignal): Promise<AlertsResponse> {
   const url = `${apiBaseUrl}/alerts?page=${page}&limit=${limit}&status=${status}`;
