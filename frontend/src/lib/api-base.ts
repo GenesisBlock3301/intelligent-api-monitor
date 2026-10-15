@@ -9,18 +9,27 @@ function hostnameOf(value: string): string | null {
 }
 
 /**
- * The API URL is compiled into the frontend. A production image built with the
- * local default still points at the viewer's own machine. When that happens,
- * call port 4000 on the host that served the page.
+ * Base URL placed before /alerts, /monitor, and /settings.
+ * An empty string keeps the request on the page origin. Frontend Nginx proxies
+ * those paths to the backend, so the browser does not open port 4000 itself.
  */
 export function resolveApiBaseUrl(pageOrigin: string, configured: string | undefined): string {
-  const configuredUrl = configured?.trim() || "http://localhost:4000";
   const pageHost = hostnameOf(pageOrigin);
-  const configuredHost = hostnameOf(configuredUrl);
+  const pageIsLocal = pageHost === null || LOCAL_HOSTS.has(pageHost);
+  const configuredUrl = configured?.trim() ?? "";
 
-  if (pageHost && configuredHost && !LOCAL_HOSTS.has(pageHost) && LOCAL_HOSTS.has(configuredHost)) {
-    const page = new URL(pageOrigin);
-    return `${page.protocol}//${page.hostname}:4000`;
+  if (!configuredUrl) {
+    return pageIsLocal ? "http://localhost:4000" : "";
+  }
+
+  const configuredHost = hostnameOf(configuredUrl);
+  if (!configuredHost) {
+    return configuredUrl;
+  }
+
+  const configuredIsLocal = LOCAL_HOSTS.has(configuredHost);
+  if (!pageIsLocal && (configuredIsLocal || configuredHost === pageHost)) {
+    return "";
   }
 
   return configuredUrl;

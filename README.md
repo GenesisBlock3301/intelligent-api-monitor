@@ -79,20 +79,24 @@ Unset `VITE_API_BASE_URL` and `CORS_ORIGINS` keep those local addresses. Docker 
 
 ### Deploy on a server
 
-The browser calls the API directly. On the Ubuntu VM at `10.250.140.136`, create `.env` next to `docker-compose.yml` before building:
+The dashboard calls `/alerts`, `/monitor`, and `/settings` on the same address that served the page. The frontend container's Nginx forwards those paths to the backend. The browser does not need to reach port 4000.
+
+On the Ubuntu VM at `10.250.140.136`, put this `.env` next to `docker-compose.yml`:
 
 ```bash
-VITE_API_BASE_URL=http://10.250.140.136:4000
 CORS_ORIGINS=http://10.250.140.136:3000,http://10.250.140.136,http://localhost:3000,http://127.0.0.1:3000
 ```
 
-`http://10.250.140.136:3000` is the frontend container. `http://10.250.140.136` is the same UI when host Nginx serves it on port 80. The local origins stay available for development and SSH tunnels.
+`http://10.250.140.136:3000` is the frontend container. `http://10.250.140.136` is the same UI when host Nginx proxies to that container. The local origins stay available for development.
+
+Copy this repository, including `frontend/nginx.conf` and `frontend/src/lib/api-base.ts`, onto the VM before building. A `.env` file alone does not change an image built from older files.
 
 ```bash
-docker compose up -d --build
+docker compose build --no-cache frontend
+docker compose up -d
 ```
 
-`VITE_API_BASE_URL` is compiled into the frontend image, so changing it needs another frontend build. If that compiled value is `http://localhost:4000` and the page is opened on the VM, the dashboard calls port 4000 on the VM host instead of the viewer's computer. `CORS_ORIGINS` is read when the backend container starts. Open `http://10.250.140.136:3000`. Requests from that page go to `http://10.250.140.136:4000`.
+Open `http://10.250.140.136:3000`. The browser requests `http://10.250.140.136:3000/alerts`. If host Nginx on port 80 serves the site, proxy every path to `http://127.0.0.1:3000` so those API paths reach the frontend container.
 
 ### Run Locally (development)
 
