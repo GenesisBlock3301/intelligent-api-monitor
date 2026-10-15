@@ -1,7 +1,9 @@
 .PHONY: help build build-nc up up-build down kill-port fresh down-v restart logs logs-backend logs-frontend shell-backend shell-db migrate test test-integration simulate seed lint clean
 
 # Variables
-DOCKER_COMPOSE = docker compose
+# backend/.env is the app env file. Pass it for Compose ${VAR} substitution
+# when it exists. The backend service also loads it with env_file.
+DOCKER_COMPOSE = docker compose $(shell if [ -f backend/.env ]; then printf '%s' '--env-file backend/.env'; fi)
 
 help: ## Show this help message
 	@echo "Usage: make [target]"

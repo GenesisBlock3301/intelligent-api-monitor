@@ -31,16 +31,13 @@ services:
     build: ./backend
     ports:
       - "4000:4000"
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       PORT: 4000
       DATABASE_URL: postgresql://api_sentinel:api_sentinel@postgres:5432/api_sentinel
       REDIS_URL: redis://redis:6379
-      HIGH_LATENCY_THRESHOLD_MS: 3000
-      MAX_MONITOR_BATCH_SIZE: 100
-      RATE_LIMIT_WINDOW_SECONDS: 60
-      RATE_LIMIT_MAX_REQUESTS: 100
-      LLM_TIMEOUT_MS: 4000
-      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}"
     depends_on:
       postgres:
         condition: service_healthy

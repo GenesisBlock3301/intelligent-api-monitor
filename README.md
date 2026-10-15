@@ -75,13 +75,13 @@ The app will be available at:
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:4000
 
-Unset `VITE_API_BASE_URL` and `CORS_ORIGINS` keep those local addresses. Docker Compose reads both from the project `.env` file or the shell.
+Backend settings live in `backend/.env`. Docker Compose loads that file into the backend container. Inside Docker it still forces `DATABASE_URL` and `REDIS_URL` to the `postgres` and `redis` services. With `CORS_ORIGINS` unset, the local dashboard origins stay allowed.
 
 ### Deploy on a server
 
 The dashboard calls `/alerts`, `/monitor`, and `/settings` on the same address that served the page. The frontend container's Nginx forwards those paths to the backend. The browser does not need to reach port 4000.
 
-On the Ubuntu VM at `10.250.140.136`, put this `.env` next to `docker-compose.yml`:
+On the Ubuntu VM at `10.250.140.136`, set the allowlist in `backend/.env`:
 
 ```bash
 CORS_ORIGINS=http://10.250.140.136:3000,http://10.250.140.136,http://localhost:3000,http://127.0.0.1:3000
@@ -89,11 +89,11 @@ CORS_ORIGINS=http://10.250.140.136:3000,http://10.250.140.136,http://localhost:3
 
 `http://10.250.140.136:3000` is the frontend container. `http://10.250.140.136` is the same UI when host Nginx proxies to that container. The local origins stay available for development.
 
-Copy this repository, including `frontend/nginx.conf` and `frontend/src/lib/api-base.ts`, onto the VM before building. A `.env` file alone does not change an image built from older files.
+Copy this repository, including `frontend/nginx.conf` and `frontend/src/lib/api-base.ts`, onto the VM before building. Then from the project root:
 
 ```bash
-docker compose build --no-cache frontend
-docker compose up -d
+docker compose --env-file backend/.env build --no-cache frontend
+docker compose --env-file backend/.env up -d
 ```
 
 Open `http://10.250.140.136:3000`. The browser requests `http://10.250.140.136:3000/alerts`. If host Nginx on port 80 serves the site, proxy every path to `http://127.0.0.1:3000` so those API paths reach the frontend container.
@@ -185,8 +185,8 @@ The app runs with **zero configuration** — all LLM and email settings are opti
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection string |
 | `HIGH_LATENCY_THRESHOLD_MS` | `3000` | Latency threshold for anomaly detection |
 | `RATE_LIMIT_MAX_REQUESTS` | `100` | Max requests per window |
-| `VITE_API_BASE_URL` | `http://localhost:4000` | API origin compiled into the frontend at build time |
-| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated browser origins allowed to call the API. Local development origins are always kept. `*` is rejected. |
+| `VITE_API_BASE_URL` | `http://localhost:4000` | Optional API origin in `backend/.env`, read when the frontend image is built |
+| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated browser origins in `backend/.env`. Local development origins are always kept. `*` is rejected. |
 
 ### Runtime Settings (via UI)
 
