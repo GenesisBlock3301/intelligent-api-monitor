@@ -46,6 +46,7 @@ async function start(): Promise<void> {
       windowSeconds: env.RATE_LIMIT_WINDOW_SECONDS,
       maxRequests: env.RATE_LIMIT_MAX_REQUESTS,
     },
+    corsOrigins: env.corsOrigins,
   });
 
   const server = app.listen(env.PORT, () => {

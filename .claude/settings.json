@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "claude.ai Airtable": { "disabled": true },
+    "claude.ai Asana": { "disabled": true },
+    "claude.ai Atlassian": { "disabled": true },
+    "claude.ai Box": { "disabled": true },
+    "claude.ai Canva": { "disabled": true },
+    "claude.ai ClickUp": { "disabled": true },
+    "claude.ai Claude Docs": { "disabled": true },
+    "claude.ai Figma": { "disabled": true },
+    "claude.ai Gmail": { "disabled": true },
+    "claude.ai Google Calendar": { "disabled": true },
+    "claude.ai Google Drive": { "disabled": true },
+    "claude.ai HubSpot": { "disabled": true },
+    "claude.ai Intercom": { "disabled": true },
+    "claude.ai Linear": { "disabled": true },
+    "claude.ai Make": { "disabled": true },
+    "claude.ai Markifact": { "disabled": true },
+    "claude.ai Miro": { "disabled": true },
+    "claude.ai Mobbin": { "disabled": true },
+    "claude.ai Notion": { "disabled": true },
+    "claude.ai Semrush": { "disabled": true },
+    "claude.ai Sentry": { "disabled": true },
+    "claude.ai Slack": { "disabled": true },
+    "claude.ai Supabase": { "disabled": true },
+    "claude.ai Todoist": { "disabled": true },
+    "claude.ai Wispr Flow": { "disabled": true },
+    "claude.ai monday.com": { "disabled": true }
+  }
+}

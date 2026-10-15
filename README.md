@@ -75,6 +75,25 @@ The app will be available at:
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:4000
 
+Unset `VITE_API_BASE_URL` and `CORS_ORIGINS` keep those local addresses. Docker Compose reads both from the project `.env` file or the shell.
+
+### Deploy on a server
+
+The browser calls the API directly. On the Ubuntu VM at `10.250.140.136`, create `.env` next to `docker-compose.yml` before building:
+
+```bash
+VITE_API_BASE_URL=http://10.250.140.136:4000
+CORS_ORIGINS=http://10.250.140.136:3000,http://10.250.140.136,http://localhost:3000,http://127.0.0.1:3000
+```
+
+`http://10.250.140.136:3000` is the frontend container. `http://10.250.140.136` is the same UI when host Nginx serves it on port 80. The local origins stay available for development and SSH tunnels.
+
+```bash
+docker compose up -d --build
+```
+
+`VITE_API_BASE_URL` is compiled into the frontend image, so changing it needs another build. `CORS_ORIGINS` is read when the backend container starts. Open `http://10.250.140.136:3000`. Requests from that page go to `http://10.250.140.136:4000`.
+
 ### Run Locally (development)
 
 ```bash
@@ -162,6 +181,8 @@ The app runs with **zero configuration** — all LLM and email settings are opti
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection string |
 | `HIGH_LATENCY_THRESHOLD_MS` | `3000` | Latency threshold for anomaly detection |
 | `RATE_LIMIT_MAX_REQUESTS` | `100` | Max requests per window |
+| `VITE_API_BASE_URL` | `http://localhost:4000` | API origin compiled into the frontend at build time |
+| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated browser origins allowed to call the API. Local development origins are always kept. `*` is rejected. |
 
 ### Runtime Settings (via UI)
 

@@ -3,6 +3,7 @@ import express from "express";
 import { pinoHttp } from "pino-http";
 import type { Redis } from "ioredis";
 
+import { LOCAL_DEV_ORIGINS } from "../config/env.js";
 import { logger } from "../infrastructure/logger.js";
 import type { IncidentRepository } from "../repositories/incident.repository.js";
 import type { SettingsRepository } from "../repositories/settings.repository.js";
@@ -19,13 +20,30 @@ interface AppDependencies {
   settingsRepository: SettingsRepository;
   redis: Redis;
   rateLimitConfig: RateLimitConfig;
+  corsOrigins?: readonly string[];
 }
 
-export function createApp({ monitoringService, incidentRepository, settingsRepository, redis, rateLimitConfig }: AppDependencies) {
+const CORS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+const CORS_ALLOWED_HEADERS = ["Content-Type"];
+
+export function createApp({
+  monitoringService,
+  incidentRepository,
+  settingsRepository,
+  redis,
+  rateLimitConfig,
+  corsOrigins = LOCAL_DEV_ORIGINS,
+}: AppDependencies) {
   const app = express();
 
   app.use(pinoHttp({ logger, autoLogging: true }));
-  app.use(cors());
+  app.use(cors({
+    origin: [...corsOrigins],
+    methods: CORS_METHODS,
+    allowedHeaders: CORS_ALLOWED_HEADERS,
+    credentials: false,
+    optionsSuccessStatus: 204,
+  }));
   app.use(express.json({ limit: "1mb" }));
 
   app.get("/health", (_request, response) => {
